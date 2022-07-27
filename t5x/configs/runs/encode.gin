@@ -1,0 +1,35 @@
+# Defaults for infer.py.
+#
+#
+# You must also include a binding for MODEL.
+#
+# Required to be set:
+#
+# - CHECKPOINT_PATH: The model checkpoint to use for inference
+#
+#
+# Commonly overridden options:
+#
+# - PjitPartitioner.num_partitions
+from __gin__ import dynamic_registration
+
+import __main__ as infer_script
+from t5x import partitioning
+from t5x import utils
+
+# Must be overridden
+CHECKPOINT_PATH = %gin.REQUIRED
+
+infer_script.infer:
+  model = %MODEL  # imported from separate gin file
+  partitioner = @partitioning.PjitPartitioner()
+  restore_checkpoint_cfg = @utils.RestoreCheckpointConfig()
+
+partitioning.PjitPartitioner:
+  num_partitions = 1
+  logical_axis_rules = @partitioning.standard_logical_axis_rules()
+
+utils.RestoreCheckpointConfig:
+  path = %CHECKPOINT_PATH
+  mode = 'specific'
+  dtype = 'float32'
