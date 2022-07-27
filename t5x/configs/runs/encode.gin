@@ -1,11 +1,11 @@
-# Defaults for infer.py.
+# Defaults for encode.py.
 #
 #
 # You must also include a binding for MODEL.
 #
 # Required to be set:
 #
-# - CHECKPOINT_PATH: The model checkpoint to use for inference
+# - CHECKPOINT_PATH: The model checkpoint to use for encoding
 #
 #
 # Commonly overridden options:
@@ -13,14 +13,14 @@
 # - PjitPartitioner.num_partitions
 from __gin__ import dynamic_registration
 
-import __main__ as infer_script
+import __main__ as encode_script
 from t5x import partitioning
 from t5x import utils
 
 # Must be overridden
 CHECKPOINT_PATH = %gin.REQUIRED
 
-infer_script.infer:
+encode_script.encode:
   model = %MODEL  # imported from separate gin file
   partitioner = @partitioning.PjitPartitioner()
   restore_checkpoint_cfg = @utils.RestoreCheckpointConfig()

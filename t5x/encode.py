@@ -134,10 +134,6 @@ if __name__ == '__main__':
     if len(argv) > 1:
       raise app.UsageError('Too many command-line arguments.')
 
-    if FLAGS.tfds_data_dir:
-      seqio.set_tfds_data_dir_override(FLAGS.tfds_data_dir)
-
-
     # Create gin-configurable version of `infer`.
     encode_using_gin = gin.configurable(encode)
 

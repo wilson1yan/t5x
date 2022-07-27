@@ -14,7 +14,7 @@ LABEL_SMOOTHING = 0.0
 # target_token_length.
 LOSS_NORMALIZING_FACTOR = None
 # Dropout should be specified in the "run" files
-DROPOUT_RATE = %gin.REQUIRED
+DROPOUT_RATE = 0.0
 
 # Vocabulary (shared by encoder and decoder)
 VOCABULARY = @seqio.SentencePieceVocabulary()
