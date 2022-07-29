@@ -337,10 +337,11 @@ class MultiHeadDotProductAttention(nn.Module):
     #       1/sqrt(depth_kq)!  This is folded into the initializers of the
     #       linear transformations, which is equivalent under Adafactor.
     depth_scaling = jnp.sqrt(self.head_dim).astype(self.dtype)
+    query_init = lambda *args: self.kernel_init(*args) / depth_scaling
 
     # Project inputs_q to multi-headed q/k/v
     # dimensions are then [batch, length, num_heads, head_dim]
-    query = projection(kernel_init=self.kernel_init, name='query')(inputs_q) / depth_scaling
+    query = projection(kernel_init=self.query_init, name='query')(inputs_q)
     key = projection(kernel_init=self.kernel_init, name='key')(inputs_kv)
     value = projection(kernel_init=self.kernel_init, name='value')(inputs_kv)
 
