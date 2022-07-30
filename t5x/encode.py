@@ -122,9 +122,8 @@ def encode(
       out_axis_resources=None
   )
 
-  config = argparse.Namespace(data_path='gs://rll-imagen/datasets/laion', batch_size=64, seed=0, max_sequence_length=512)
-  dataset, fns = data.load_laion(config, train=True)
-  assert len(dataset) == len(fns)
+  config = argparse.Namespace(data_path='gs://rll-imagen/datasets/laion400m/laion400m-data', batch_size=64, seed=0, max_sequence_length=512)
+  dataset = data.load_laion(config)
 
   queue = mp.Queue()
   process = mp.Process(target=save_worker, args=(queue,))
@@ -132,7 +131,8 @@ def encode(
 
   batch_size = 64
   pbar = tqdm(total=len(dataset))
-  for i, tokens in enumerate(dataset):
+  for tokens, path in dataset:
+      path = path.numpy().decode('utf-8')
       tokens = tokens.numpy()
       idx_offset = 0
       features, idxs = [], []
@@ -150,7 +150,7 @@ def encode(
       features = np.concatenate(features)
       idxs = np.concatenate(idxs)
 
-      queue.put((features.tobytes(), features.shape, idxs.tobytes(), idxs.shape, fns[i]))
+      queue.put((features.tobytes(), features.shape, idxs.tobytes(), idxs.shape, path))
 
       pbar.update(1)
       pbar.set_description(f'{features.shape}')
@@ -192,9 +192,9 @@ def get_feats_compact(feats_padded, tokens, eos_id=1):
     out, out_idxs = [], [0]
     for i in range(tokens.shape[0]):
         f, t = feats_padded[i], tokens[i]
-        idxs = np.nonzero(t == 1)[0]
+        idxs = np.nonzero(t == eos_id)[0]
         assert len(idxs) == 1
-        idx = idxs[0]
+        idx = idxs[0] + 1
         f = f[:idx]
         out.append(f)
         out_idxs.append(out_idxs[-1] + idx)
