@@ -122,8 +122,8 @@ def encode(
       out_axis_resources=None
   )
 
-  config = argparse.Namespace(data_path='/home/wilson/laion', batch_size=64, seed=0, max_sequence_length=512)
-  dataset, fns = data.load_laion(config, train=False)
+  config = argparse.Namespace(data_path='gs://rll-imagen/datasets/laion', batch_size=64, seed=0, max_sequence_length=512)
+  dataset, fns = data.load_laion(config, train=True)
   assert len(dataset) == len(fns)
 
   queue = mp.Queue()
