@@ -35,7 +35,7 @@ def load_text(split, shuffle_files, seed=None):
         return tf.data.Dataset.from_tensor_slices({'tokens': texts})
 
     dataset = dataset.flat_map(process)
-    return dataset
+    return dataset, fns
 
 
 vocabulary = seqio.SentencePieceVocabulary(

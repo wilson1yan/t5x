@@ -17,6 +17,7 @@ eval_script.evaluate:
   model = %MODEL  # imported from separate gin file
   dataset_cfg = @utils.DatasetConfig()
   restore_checkpoint_cfg = @utils.RestoreCheckpointConfig()
+  partitioner = @partitioning.PjitPartitioner()
   output_dir = %EVAL_OUTPUT_DIR
 
 utils.DatasetConfig:

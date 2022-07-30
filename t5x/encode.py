@@ -20,11 +20,13 @@ r"""This script runs inference on a T5X-compatible model.
 # pyformat: enable
 # pylint:enable=line-too-long
 
+import time
 import concurrent.futures
 import functools
 import hashlib
 import json
 import os
+import os.path as osp
 import re
 import shutil
 import time
@@ -41,13 +43,18 @@ from jax.experimental import multihost_utils
 import jax.numpy as jnp
 import numpy as np
 import seqio
+import argparse
 from t5x import gin_utils
 from t5x import models
 from t5x import partitioning
 from t5x import utils
+from t5x import data
 import tensorflow as tf
 from tensorflow.io import gfile
 from typing_extensions import Protocol
+import io
+import multiprocessing as mp
+from tqdm import tqdm
 
 # Automatically search for gin files relative to the T5X package.
 _DEFAULT_GIN_SEARCH_PATHS = [
@@ -55,6 +62,11 @@ _DEFAULT_GIN_SEARCH_PATHS = [
 ]
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
+
+def print_model_size(params):
+    model_params_size = jax.tree_map(lambda x: x.size, params)
+    total_params_size = sum(jax.tree_flatten(model_params_size)[0])
+    print('model parameter count:', total_params_size)
 
 
 def encode(
@@ -75,8 +87,8 @@ def encode(
   """
   logging.info('Process ID: %d', jax.process_index())
 
-  input_shapes = {}
-  input_types = {}
+  input_shapes = {'encoder_input_tokens': [1, 512], 'decoder_input_tokens': [1, 62]}
+  input_types = {'encoder_input_tokens': jnp.int32, 'decoder_input_tokens': jnp.int32}
 
   # Initialize optimizer from the existing checkpoint.
   # TODO(adarob): Support inference over multiple checkpoints.
@@ -86,14 +98,109 @@ def encode(
       input_shapes=input_shapes,
       input_types=input_types,
       partitioner=partitioner)
+  train_state_axes = train_state_initializer.train_state_axes
 
   # Disable strictness since we are dropping the optimizer state.
   restore_checkpoint_cfg.strict = False
 
   train_state = train_state_initializer.from_checkpoint(
       [restore_checkpoint_cfg], init_rng=jax.random.PRNGKey(0))
-  import ipdb; ipdb.set_trace()
+  print_model_size(train_state.params)
+
+  def encode_fn(params, encoder_input_tokens):
+    return model.module.apply( 
+        {'params': params},
+        encoder_input_tokens=encoder_input_tokens,
+        enable_dropout=False,
+        method=model.module.encode
+    )
+
+  encode_fn = partitioner.partition(
+      encode_fn,
+      in_axis_resources=(train_state_axes.params,
+                         partitioner.data_partition_spec),
+      out_axis_resources=None
+  )
+
+  config = argparse.Namespace(data_path='/home/wilson/laion', batch_size=64, seed=0, max_sequence_length=512)
+  dataset, fns = data.load_laion(config, train=False)
+  assert len(dataset) == len(fns)
+
+  queue = mp.Queue()
+  process = mp.Process(target=save_worker, args=(queue,))
+  process.start()
+
+  batch_size = 64
+  pbar = tqdm(total=len(dataset))
+  for i, tokens in enumerate(dataset):
+      tokens = tokens.numpy()
+      idx_offset = 0
+      features, idxs = [], []
+      for j in range(0, tokens.shape[0], batch_size):
+          inp = tokens[j:j + batch_size]
+          n = inp.shape[0]
+          inp = np.pad(inp, ((0, batch_size - n), (0, 0)))
+          feats_padded = jax.device_get(encode_fn(train_state.params, inp))
+          feats_compact, feats_idxs = get_feats_compact(feats_padded[:n], inp[:n])
+          feats_idxs += idx_offset
+          idx_offset += feats_compact.shape[0]
+          
+          features.append(feats_compact)
+          idxs.append(feats_idxs)  
+      features = np.concatenate(features)
+      idxs = np.concatenate(idxs)
+
+      queue.put((features.tobytes(), features.shape, idxs.tobytes(), idxs.shape, fns[i]))
+
+      pbar.update(1)
+      pbar.set_description(f'{features.shape}')
+  queue.put(None)
+  process.join()
+
   logging.info('DONE')
+
+
+def save_worker(queue):
+    while True:
+        out = queue.get()
+        if out is None:
+            break
+        features, f_shape, idxs, i_shape, fn = out
+        features = np.frombuffer(features, dtype=jnp.bfloat16).reshape(f_shape)
+        idxs = np.frombuffer(idxs, dtype=np.int64).reshape(i_shape)
+        save_data(fn, features, idxs)
+
+
+def save_data(dst, features, idxs):
+    dst = dst[:-3] + 'npz'
+    # Saves to tmp file specific to host
+    tmp_file = osp.join(osp.dirname(dst), f'tmp_{jax.process_index()}')
+    to_save = io.BytesIO()
+    np.savez_compressed(to_save, feature=features, idx=idxs)
+    to_save.seek(0)
+
+    with gfile.GFile(tmp_file, 'wb') as fp:
+        fp.write(to_save.read())
+
+    # Renames tmp file (this is to handle the case when pre-empted)
+    gfile.rename(tmp_file, dst, overwrite=True)
+        
+
+
+def get_feats_compact(feats_padded, tokens, eos_id=1):
+    assert feats_padded.shape[0] == tokens.shape[0]
+    out, out_idxs = [], [0]
+    for i in range(tokens.shape[0]):
+        f, t = feats_padded[i], tokens[i]
+        idxs = np.nonzero(t == 1)[0]
+        assert len(idxs) == 1
+        idx = idxs[0]
+        f = f[:idx]
+        out.append(f)
+        out_idxs.append(out_idxs[-1] + idx)
+    out = np.concatenate(out, axis=0)
+    out_idxs = np.array(out_idxs[:-1])
+    return out, out_idxs
 
 
 if __name__ == '__main__':

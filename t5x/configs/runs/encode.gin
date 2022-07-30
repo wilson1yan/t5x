@@ -32,4 +32,4 @@ partitioning.PjitPartitioner:
 utils.RestoreCheckpointConfig:
   path = %CHECKPOINT_PATH
   mode = 'specific'
-  dtype = 'float32'
+  dtype = 'bfloat16'
