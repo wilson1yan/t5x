@@ -18,11 +18,20 @@ GCS_PATH = 'gs://imagen/datasets'
 def load_laion(config, train):
     split = 'train' if train else 'test'
     folder = osp.join(config.data_path,  split, '*.tar')
+    folder_npz = osp.join(config.data_path, split, '*.npz')
     if folder.startswith('gs://'):
         fns = tf.io.gfile.glob(folder)
+        fns_npz = tf.io.gfile.glob(folder)
     else:
         fns = list(glob.glob(folder))
+        fns_npz = list(glob.glob(folder))
     fns.sort()
+
+    with_npz = set([fn[:-4] for fn in fns_npz])
+    print('Already computed for {len(with_npz)} files')
+    original_len = len(fns)
+    fns = [fn for fn in fns if fn[:-4] in with_npz]
+    print(f'Computing for {len(fns)} / {original_len}')
     
     tokenizer = seqio.SentencePieceVocabulary('gs://t5-data/vocabs/cc_all.32000.100extra/sentencepiece.model')
 
