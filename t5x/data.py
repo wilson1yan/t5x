@@ -26,7 +26,7 @@ def load_laion(config):
     fns = np.array_split(fns, n_shards)[shard_id].tolist()
 
     with_npz = set([fn[:-4] for fn in fns_npz])
-    print('Already computed for {len(with_npz)} files')
+    print(f'Already computed for {len(with_npz)} files')
     original_len = len(fns)
     fns = [fn for fn in fns if fn[:-4] not in with_npz]
     print(f'Computing for {len(fns)} / {original_len}')
