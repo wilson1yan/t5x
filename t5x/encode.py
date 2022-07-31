@@ -153,7 +153,7 @@ def encode(
       queue.put((features.tobytes(), features.shape, idxs.tobytes(), idxs.shape, path))
 
       pbar.update(1)
-      pbar.set_description(f'{features.shape}')
+      pbar.set_description(f'{osp.basename(path)}, {features.shape}')
   queue.put(None)
   process.join()
 

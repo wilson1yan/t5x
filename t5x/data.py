@@ -1,6 +1,8 @@
 import glob
 import os.path as osp
 import io
+import jax
+import numpy as np
 import tarfile
 import tensorflow as tf
 from tensorflow.python.lib.io import file_io
@@ -19,15 +21,20 @@ def load_laion(config):
         fns_npz = list(glob.glob(folder_npz))
     fns.sort()
 
+    shard_id = jax.process_index()
+    n_shards = jax.process_count()
+    fns = np.array_split(fns, n_shards)[shard_id].tolist()
+
     with_npz = set([fn[:-4] for fn in fns_npz])
     print('Already computed for {len(with_npz)} files')
     original_len = len(fns)
-    fns = [fn for fn in fns if fn[:-4] in with_npz]
+    fns = [fn for fn in fns if fn[:-4] not in with_npz]
     print(f'Computing for {len(fns)} / {original_len}')
     
     tokenizer = seqio.SentencePieceVocabulary('gs://t5-data/vocabs/cc_all.32000.100extra/sentencepiece.model')
 
     def read(path):
+        path_name = path
         path = io.BytesIO(file_io.FileIO(path, 'rb').read())
         tar = tarfile.open(fileobj=path)
 
@@ -42,7 +49,7 @@ def load_laion(config):
                 text = content
                 texts.append(text)
         texts = tf.convert_to_tensor(texts, dtype=tf.string)
-        return texts, path
+        return texts, path_name
         
 
     dataset = tf.data.Dataset.from_tensor_slices(fns)
