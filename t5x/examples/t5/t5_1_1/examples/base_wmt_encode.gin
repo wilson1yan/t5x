@@ -9,5 +9,6 @@ include "t5x/examples/t5/t5_1_0/11B.gin"
 include "t5x/configs/runs/encode.gin"
 
 DROPOUT_RATE = 0.0  # unused but needs to be specified
+CHECKPOINT_PATH="gs://t5-data/pretrained_models/11B/model.ckpt-1000000"
 
 partitioning.PjitPartitioner.num_partitions = 2
