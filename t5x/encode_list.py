@@ -282,7 +282,8 @@ def encode_list(
 
   tokenizer = seqio.SentencePieceVocabulary('gs://t5-data/vocabs/cc_all.32000.100extra/sentencepiece.model')
   tokens = tokenizer.encode_tf(queries)
-  tokens = tf_text.pad_model_inputs(tokens, 512)[0].numpy()
+  tokens, text_mask = tf_text.pad_model_inputs(tokens, 512)
+  tokens, text_mask = tokens.numpy(), text_mask.numpy()
 
   batch_size = 64
   pbar = tqdm(total=len(tokens))
@@ -297,7 +298,7 @@ def encode_list(
     pbar.update(n)
   features = np.concatenate(features, axis=0)
 
-  np.savez_compressed('precomputed_queries.npz', text=queries, feature=features)
+  np.savez_compressed('precomputed_queries.npz', text=queries, feature=features, mask=text_mask)
 
   logging.info('DONE')
 
