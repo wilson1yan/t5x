@@ -91,10 +91,11 @@ def encode_json(
   logging.info('Process ID: %d', jax.process_index())
 
   fname = 'ssv2_text.json'
+  max_tokens = 64
   base_name = osp.basename(fname).split('.')[0]
   data = json.load(open(fname, 'r'))
 
-  input_shapes = {'encoder_input_tokens': [1, 512], 'decoder_input_tokens': [1, 62]}
+  input_shapes = {'encoder_input_tokens': [1, max_tokens], 'decoder_input_tokens': [1, 62]}
   input_types = {'encoder_input_tokens': jnp.int32, 'decoder_input_tokens': jnp.int32}
 
   # Initialize optimizer from the existing checkpoint.
@@ -134,7 +135,7 @@ def encode_json(
   for split, texts in data.items():
     print('Computing split:', split)
     tokens = tokenizer.encode_tf(texts)
-    tokens, text_mask = tf_text.pad_model_inputs(tokens, 512)
+    tokens, text_mask = tf_text.pad_model_inputs(tokens, max_tokens)
     tokens, text_mask = tokens.numpy(), text_mask.numpy()
 
     batch_size = 64
