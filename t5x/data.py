@@ -21,16 +21,17 @@ def load_laion(config):
         fns_npz = list(glob.glob(folder_npz))
     fns.sort()
 
-    shard_id = jax.process_index()
-    n_shards = jax.process_count()
-    fns = np.array_split(fns, n_shards)[shard_id].tolist()
-
     with_npz = set([fn[:-4] for fn in fns_npz])
     print(f'Already computed for {len(with_npz)} files')
     original_len = len(fns)
     fns = [fn for fn in fns if fn[:-4] not in with_npz]
     print(f'Computing for {len(fns)} / {original_len}')
-    
+
+    shard_id = jax.process_index()
+    n_shards = jax.process_count()
+    fns = np.array_split(fns, n_shards)[shard_id].tolist()
+    print(f'Locally computing', len(fns))
+ 
     tokenizer = seqio.SentencePieceVocabulary('gs://t5-data/vocabs/cc_all.32000.100extra/sentencepiece.model')
 
     def read(path):
