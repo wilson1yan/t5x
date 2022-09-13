@@ -50,15 +50,11 @@ setuptools.setup(
         'cached_property',
         # TODO(adarob): Replace with 'clu' once >0.0.6 is released.
         'clu @ git+https://github.com/google/CommonLoopUtils#egg=clu',
-        'flax @ git+https://github.com/google/flax#egg=flax',
         'gin-config',
-        f'jax >= {_jax_version}',
-        f'jaxlib >= {_jaxlib_version}',
         'numpy',
         'orbax==0.0.4',
         'seqio-nightly',
         't5',
-        'tensorflow',
         'tensorstore >= 0.1.20',
     ],
     extras_require={
